@@ -490,7 +490,7 @@ textarea::placeholder,input::placeholder{color:#6B7378}
             <div ref="{{ gutterRef }}" style="flex:none;width:52px;overflow:hidden;background:#F7F8F9;border-right:1px solid #E6E7E8;padding:12px 0">
               <sc-for list="{{ ls.lines }}" as="ln" hint-placeholder-count="20"><div style="text-align:right;padding-right:12px;font:400 {{ ui.fs }}/1.6 'Roboto Mono',monospace;color:{{ ln.fg }};background:{{ ln.bg }}">{{ ln.n }}</div></sc-for>
             </div>
-            <textarea ref="{{ taRef }}" value="{{ ls.code }}" sc-camel-on-change="{{ onLessonCode }}" sc-camel-on-scroll="{{ onEdScroll }}" sc-camel-on-key-down="{{ onEdKey }}" sc-camel-read-only="{{ ls.locked }}" spellcheck="false" placeholder="Type your HTML code here…" aria-label="Code editor" style="flex:1;min-width:0;resize:none;border:0;outline:none;padding:12px 16px;margin:0;font:400 {{ ui.fs }}/1.6 'Roboto Mono',monospace;color:#3A4146;background:#FFFFFF;white-space:pre;overflow:auto;tab-size:4"></textarea>
+            <textarea ref="{{ taRef }}" value="{{ ls.code }}" sc-camel-on-change="{{ onLessonCode }}" sc-camel-on-scroll="{{ onEdScroll }}" sc-camel-on-key-down="{{ onEdKey }}" sc-camel-read-only="{{ ls.ro }}" spellcheck="false" placeholder="Type your HTML code here…" aria-label="Code editor" style="flex:1;min-width:0;resize:none;border:0;outline:none;padding:12px 16px;margin:0;font:400 {{ ui.fs }}/1.6 'Roboto Mono',monospace;color:#3A4146;background:#FFFFFF;white-space:pre;overflow:auto;tab-size:4"></textarea>
           </div>
       </div>
       <div role="separator" aria-orientation="horizontal" aria-label="Drag to resize" sc-camel-on-mouse-down="{{ drag.prev }}" style="cursor:row-resize;background:#F0F1F2;touch-action:none" style-hover="background:#B3D9EE"></div>
@@ -1319,7 +1319,7 @@ class Component extends DCLogic {
       const nextLessonAfterGame = { 1: 2, 3: 4, 4: 6 };
       let nextGo = () => nextMap[0] === 'G' ? this.openGame(nextMap[1]) : this.openLesson(nextMap[1]), nextDone = '';
       if (nextMap[0] === 'G' && this.gDone(nextMap[1], p)) { const nl = nextLessonAfterGame[nextMap[1]]; nextDone = this.GAMES[nextMap[1]].name + ' completed'; nextGo = () => this.openLesson(nl); }
-      const setCode = (val) => { const was = isDone(code), now = isDone(val); this.setP(pp => { const r = pp.L[id] || {}; r.code = val; r.complete = !!(now && r.locked); if (!val.trim()) { delete r.locked; r.complete = false; } pp.L[id] = r; pp.last = id; }); if (!locked && now && !was) this.toast('All target code is done. Select Complete Lesson to finish.', true); };
+      const setCode = (val) => { const was = isDone(code), now = isDone(val); this.setP(pp => { const r = pp.L[id] || {}; r.code = val; r.complete = !!r.locked; pp.L[id] = r; pp.last = id; }); if (!locked && now && !was) this.toast('All target code is done. Select Complete Lesson to finish.', true); };
       out.ls = {
         tabs: [['task', 'Task'], ['expl', 'Explanation']].map(([tid, label]) => { const on = ui.ltab === tid; return { label, sel: on ? 'true' : 'false', go: () => this.setUi({ ltab: tid }), color: on ? '#3A4146' : '#575F65', w: on ? 700 : 500, line: on ? '#0080C5' : 'transparent' }; }),
         isTask: ui.ltab === 'task', isExpl: ui.ltab === 'expl',
@@ -1330,7 +1330,7 @@ class Component extends DCLogic {
         cantComplete: !complete, cBg: complete ? '#BFD630' : '#E6E7E8', cFg: complete ? '#3A4146' : '#6B7378', cCur: complete ? 'pointer' : 'not-allowed', cNote: complete ? 'All code is correct. Complete the lesson when you\'re ready.' : 'Match all ' + total + ' items to finish.',
         explText: L.explanation.en,
         explain: this.explainList(code), file: 'lesson-' + id + '.html',
-        code, locked, notLocked: !locked, lines: this.lines(code),
+        code, locked, notLocked: !locked, ro: false, lines: this.lines(code),
         state: locked ? 'Complete' : complete ? 'All correct' : code ? 'In progress' : 'Not started', stateFg: locked || complete ? '#1F7A2E' : code ? '#005F94' : '#646C72',
         canCopyPrev: !!copyMap[id] && !locked, copyPrevLabel: 'Copy code from Lesson ' + copyMap[id],
         previewTitle: titleM && titleM[1].trim() ? 'Live Output: ' + titleM[1].trim() : 'Live Output Preview',
@@ -1341,8 +1341,8 @@ class Component extends DCLogic {
       out.ls.explEmpty = out.ls.explain.length === 0;
       panelW();
       out.langs = [['en', 'English'], ['ms', 'Bahasa Melayu']].map(([lid, label]) => ({ label, sel: s.lang === lid ? 'true' : 'false', bg: s.lang === lid ? '#0080C5' : '#FFFFFF', fg: s.lang === lid ? '#FFFFFF' : '#3A4146', pick: () => this.setState({ lang: lid }) }));
-      out.onLessonCode = e => { if (locked) return; const val = e.target.value; setCode(val); if (val.toLowerCase().includes('pdicsr')) this.confirm('Use the Secret Code?', 'This auto-completes the lesson and overwrites your current code.', 'Auto-complete', () => { setCode(shown); this.toast('Lesson code filled in.', true); }); };
-      out.onEdKey = e => { if (!locked) this.edKey(e, setCode); };
+      out.onLessonCode = e => { const val = e.target.value; setCode(val); if (val.toLowerCase().includes('pdicsr')) this.confirm('Use the Secret Code?', 'This auto-completes the lesson and overwrites your current code.', 'Auto-complete', () => { setCode(shown); this.toast('Lesson code filled in.', true); }); };
+      out.onEdKey = e => this.edKey(e, setCode);
       out.askClearLesson = () => this.confirm('Clear the Editor?', 'This removes all the code you typed for this lesson.', 'Clear', () => setCode(''), true);
       out.copyLessonCode = () => this.copy(code, 'Code copied');
       out.copyPrev = () => { const prev = (p.L[copyMap[id]] || {}).code; if (!prev) { this.toast('No saved code from Lesson ' + copyMap[id] + ' yet.'); return; } this.confirm('Copy Code from Lesson ' + copyMap[id] + '?', 'This will overwrite your current code in the workspace.', 'Copy Code', () => { setCode(prev); this.toast('Code copied from Lesson ' + copyMap[id]); }); };
