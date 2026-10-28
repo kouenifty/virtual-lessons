@@ -958,7 +958,7 @@ class Component extends DCLogic {
   PROMPT = 'Write a complete, single-file HTML, CSS and JavaScript code for a Malaysia school website name [schoolname]. The website must include:\n1. A header navigation and links.\n2. A welcome section with a heading: "Welcome to [School Name]".\n3. An "About Our School" description paragraph.\n4. A simple Game.\n5. A footer at the bottom.\nStyle the webpage with a beautiful and modern color scheme, proper layout spacing and responsive design. Return only the HTML code inside a single code block.';
   SECRET = 'pdicsr';
   CHANGELOG = [
-    { v: 'v2.4', d: '28 Oct 2026', items: ['Rebuilt as one plain HTML file: styles, page, app logic and libraries sit in clearly labelled sections and work offline.', 'Pictures saved next to the file, like profilepicture.png, now show in the live previews.', 'Completed lessons stay complete and their code can still be edited.', 'Expanding a side panel opens it to its full width straight away.', 'Settings has a close button at the top right. Version and credit sit at the bottom of Settings.', 'Changelog moved from Settings to its own section in Admin.', 'Admin shows the admin password and the lesson secret code.'] },
+    { v: 'v2.4', d: '28 Oct 2026', items: ['Rebuilt as one plain HTML file: styles, page, app logic and libraries sit in clearly labelled sections and work offline.', 'Pictures saved next to the file, like profilepicture.png, now show in the live previews.', 'Completed lessons stay complete and their code can still be edited.', 'Expanding a side panel opens it to its full width straight away.', 'Settings has a close button at the top right. Version and credit sit at the bottom of Settings.', 'Changelog moved from Settings to its own section in Admin.', 'Admin shows the admin password and the lesson secret code.', 'Lessons 1 to 3 use real pictures: team.png for team profiles, boy.png or girl.png (your choice) for solo profiles.'] },
     { v: 'v2.1', d: '21 Oct 2026', items: ['Home replaces Lessons in the top bar: a welcome with your name and progress sits above the lessons list.', 'Top bar order: Home, Lesson, Validator. Lesson takes you back to where you last left off.', 'Lessons: instructions on the left, your code and live output on the right.', 'Lesson panel tabs: Task, Explanation and Tags. The tag checklist has its own tab.', 'Admin tab beside Validator, greyed out and password-protected on every visit: unlock all lessons, complete all tests, unlock the certificate and download a certificate preview.', 'Changelog can be copied with one click or selected as text.', 'One look across the portal: matching panel bars, three button heights, one tab style, the same editor buttons in Validator and Lessons.', 'Lesson 6 matches lessons 1 to 5. Larger text throughout for easier reading.'] },
     { v: 'v2.0', d: '19 Oct 2026', items: ['Renamed to SEPRO Web Programming, with the SEPRO lockup and the Sarawak Energy logo.', 'Restyled to the SE Product Design Guidelines: Encode Sans, SE Blue, Lime and Grey, square corners, CURIA colour divider.', 'One SE theme; the Dark, Sakura and other themes are removed.', 'Emoji replaced with line icons. Shorter messages outside the lesson content.', 'Lessons menu: next lesson marked Up next, locked lessons say what unlocks them.', 'Lesson screen: progress bar, What to do box, labelled target code and a clearer tag checklist with Correct, Missing and Extra states.', 'Settings drawer with profiles, layout, progress reset and the changelog.'] },
     { v: 'v1.0', d: 'Jul 2026', items: ['First release as Web Learning Portal: code validator, lessons, mini-games and certificate.'] }
@@ -1313,9 +1313,14 @@ class Component extends DCLogic {
       const good = it => it.status === 'match' && (it.expected.kind === 'html' ? !(it.student && it.student.partial) : !!it.exactMatch);
       const teamRule = team && id === 1;
       const nameCount = c => { const m = c.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i); return m ? m[1].replace(/<[^>]*>/g, '').split(/,|&|\band\b|\bdan\b/i).map(x => x.trim()).filter(Boolean).length : 0; };
-      const isDone = c => { const a = E.alignTags(exp, E.extractTags(c)); return a.length > 0 && a.every(good) && (!teamRule || nameCount(c) >= 2); };
-      const al = E.alignTags(exp, E.extractTags(code));
-      const tagsOk = al.length > 0 && al.every(good), namesOk = !teamRule || nameCount(code) >= 2, complete = tagsOk && namesOk;
+      const picRule = id <= 3, pics = team ? ['team.png'] : ['boy.png', 'girl.png'];
+      const picOk = c => { if (!picRule) return true; const m = c.match(/<img\b[^>]*\bsrc\s*=\s*["']?([^"'\s>]+)/i); return !!m && pics.includes(m[1].toLowerCase()); };
+      const picNote = !picRule ? '' : team ? ' Use team.png as your team picture.' : ' For your picture, choose boy.png or girl.png and type it in <img src="">.';
+      // The tag check compares whole tags, so the picture name is left out of it (read as the target's boy.png); picOk checks the name.
+      const picNorm = c => !picRule ? c : c.replace(/(<img\b[^>]*\bsrc\s*=\s*["']?)([^"'\s>]+)/i, (m, a) => a + 'boy.png');
+      const isDone = c => { const a = E.alignTags(exp, E.extractTags(picNorm(c))); return a.length > 0 && a.every(good) && (!teamRule || nameCount(c) >= 2) && picOk(c); };
+      const al = E.alignTags(exp, E.extractTags(picNorm(code)));
+      const tagsOk = al.length > 0 && al.every(good), namesOk = !teamRule || nameCount(code) >= 2, picsOk = picOk(code), complete = tagsOk && namesOk && picsOk;
       const matched = al.filter(good).length, total = al.filter(x => x.status !== 'extra').length;
       const lineOf = idx => target.slice(0, idx).split('\n').length;
       const lineSt = {}; al.forEach(it => { if (!it.expected) return; const ln = lineOf(it.expected.index); if (!lineSt[ln]) lineSt[ln] = 'done'; if (!good(it)) lineSt[ln] = 'todo'; });
@@ -1332,7 +1337,7 @@ class Component extends DCLogic {
       const prevT = copyMap[id] ? E.LESSONS.find(x => x.id === copyMap[id]).code.replace(/\\x3C/g, '<') : null;
       const bag = {}; if (prevT) prevT.split('\n').forEach(l => { const k = l.trim(); if (k) bag[k] = (bag[k] || 0) + 1; });
       const isOld = target.split('\n').map(l => { const k = l.trim(); if (prevT && k && bag[k]) { bag[k]--; return true; } return false; });
-      const shown = team && id <= 3 ? target.replace('<h1> My Profile </h1>', '<h1> Our Team Profile </h1>').replace('<h2>Ali Abu</h2>', '<h2>Ali Abu & Siti Aminah</h2>') : target;
+      const shown = team && id <= 3 ? target.replace('boy.png', 'team.png').replace('<h1> My Profile </h1>', '<h1> Our Team Profile </h1>').replace('<h2>Ali Abu</h2>', '<h2>Ali Abu & Siti Aminah</h2>') : target;
       const nextMap = { 1: ['G', 1], 2: ['L', 3], 3: ['G', 3], 4: ['L', 5], 5: ['G', 4] }[id];
       const nextLessonAfterGame = { 1: 2, 3: 4, 4: 6 };
       let nextGo = () => nextMap[0] === 'G' ? this.openGame(nextMap[1]) : this.openLesson(nextMap[1]), nextDone = '';
@@ -1341,10 +1346,10 @@ class Component extends DCLogic {
       out.ls = {
         tabs: [['task', 'Task'], ['expl', 'Explanation']].map(([tid, label]) => { const on = ui.ltab === tid; return { label, sel: on ? 'true' : 'false', go: () => this.setUi({ ltab: tid }), color: on ? '#3A4146' : '#575F65', w: on ? 700 : 500, line: on ? '#0080C5' : 'transparent' }; }),
         isTask: ui.ltab === 'task', isExpl: ui.ltab === 'expl',
-        instructions: teamRule ? 'Make a profile page for your team. Put at least two member names in the <h2>, separated by "&" or a comma. Then add your team\'s details, following the structure below.' : L.instructions,
+        instructions: teamRule ? 'Make a profile page for your team. Put at least two member names in the <h2>, separated by "&" or a comma. Then add your team\'s details, following the structure below.' + picNote : L.instructions + picNote,
         target: shown.split('\n').map((c, i) => { const st = lineSt[i + 1], nx = nextLine === i + 1, dn = st === 'done', old = isOld[i]; return { n: i + 1, code: c, tick: dn ? 1 : 0, fg: prevT ? (old ? '#A3AAAF' : (dn ? '#3A4146' : '#1B2226')) : (dn ? '#6B7378' : '#3A4146'), w: prevT && !old && !dn ? 600 : 400, bg: nx ? '#E6F2F9' : 'transparent', edge: nx ? 'inset 3px 0 0 #0080C5' : 'none' }; }),
         hasPrev: !!prevT, prevNote: prevT ? 'From Lesson ' + copyMap[id] + '. Already typed.' : '',
-        teamWarn: teamRule && tagsOk && !namesOk ? 'Team mode: put at least two member names in the <h2>, e.g. Ali Abu & Siti Aminah.' : '',
+        teamWarn: teamRule && tagsOk && !namesOk ? 'Team mode: put at least two member names in the <h2>, e.g. Ali Abu & Siti Aminah.' : tagsOk && !picsOk ? (team ? 'Team mode: your picture must be team.png, e.g. <img src="team.png">.' : 'Your picture must be boy.png or girl.png, e.g. <img src="girl.png">.') : '',
         cantComplete: !complete, cBg: complete ? '#BFD630' : '#E6E7E8', cFg: complete ? '#3A4146' : '#6B7378', cCur: complete ? 'pointer' : 'not-allowed', cNote: complete ? 'All code is correct. Complete the lesson when you\'re ready.' : 'Match all ' + total + ' items to finish.',
         explText: L.explanation.en,
         explain: this.explainList(code), file: 'lesson-' + id + '.html',
@@ -1694,7 +1699,7 @@ class Component extends DCLogic {
 </head>
 <body>
     <h1> My Profile </h1>
-    <img src="profilepicture.png" alt="my photo">
+    <img src="boy.png" alt="my photo">
     <h2>Ali Abu</h2>
     <p>Welcome to my first website. I'm from Kuching, Sarawak!</p>
         <hr>
@@ -1726,7 +1731,7 @@ body {
 </head>
 <body>
     <h1> My Profile </h1>
-    <img src="profilepicture.png" alt="my photo">   
+    <img src="boy.png" alt="my photo">   
     <h2>Ali Abu</h2>
     <p>Welcome to my first website. I'm from Kuching, Sarawak!</p>
         <hr>
@@ -1758,7 +1763,7 @@ body {
    </head>
    <body>
          <h1> My Profile </h1>
-         <img src="profilepicture.png" alt="my photo">
+         <img src="boy.png" alt="my photo">
          <h2>Ali Abu</h2>
          <p>Welcome to my first website. I'm from Kuching, Sarawak!</p>
          <hr>
